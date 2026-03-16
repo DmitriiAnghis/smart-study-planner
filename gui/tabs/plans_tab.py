@@ -44,7 +44,7 @@ class PlansTab:
         cb.pack(fill="x", pady=(2, 10))
 
         # Дней до экзамена
-        tk.Label(left, text="Дней до экзамена:",
+        tk.Label(left, text="Дней до  экзамена:",
                  font=("Segoe UI", 10)).pack(anchor="w")
         self.plan_days_var = tk.IntVar(value=14)
         tk.Spinbox(left, from_=1, to=120,
