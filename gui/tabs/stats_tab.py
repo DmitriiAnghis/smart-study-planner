@@ -17,7 +17,7 @@ class StatsTab:
     def _build(self):
         tab = self.frame
 
-        tk.Label(tab, text="Статистика сессии (Singleton)",
+        tk.Label(tab, text="Статистика сессии  (Singleton)",
                  font=("Segoe UI", 13, "bold")).pack(
                      anchor="w", padx=16, pady=(14, 10))
 
