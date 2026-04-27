@@ -79,11 +79,11 @@ class GoogleCalendarAdapter(ITaskImporter):
                 "Повторение": RevisionTaskCreator}
 
     def __init__(self):
-        self._adaptee = GoogleCalendarAPI()     # «adaptee» из GoF-схемы
+        self._adaptee = GoogleCalendarAPI()     
 
     def import_tasks(self) -> List[StudyTask]:
         """Request() — адаптируем SpecificRequest() к нашему интерфейсу."""
-        raw_events = self._adaptee.fetch_events()   # adaptee->SpecificRequest()
+        raw_events = self._adaptee.fetch_events()   
         tasks = []
         for event in raw_events:
             parsed  = self._adaptee.parse_event(event)
@@ -105,11 +105,11 @@ class TrelloAdapter(ITaskImporter):
                 "Повторение": RevisionTaskCreator}
 
     def __init__(self, board_id: str = "study_board"):
-        self._adaptee  = TrelloAPI()            # «adaptee» из GoF-схемы
+        self._adaptee  = TrelloAPI()            
         self._board_id = board_id
 
     def import_tasks(self) -> List[StudyTask]:
-        cards = self._adaptee.get_cards(self._board_id)   # adaptee->SpecificRequest()
+        cards = self._adaptee.get_cards(self._board_id)  
         tasks = []
         for card in cards:
             ttype   = card["labels"][0] if card["labels"] else "Лекция"
@@ -130,10 +130,10 @@ class PlainTextAdapter(ITaskImporter):
                 "Повторение": RevisionTaskCreator}
 
     def __init__(self):
-        self._adaptee = PlainTextSchedule()     # «adaptee» из GoF-схемы
+        self._adaptee = PlainTextSchedule()     
 
     def import_tasks(self) -> List[StudyTask]:
-        raw   = self._adaptee.read_schedule()   # adaptee->SpecificRequest()
+        raw   = self._adaptee.read_schedule()   
         tasks = []
         for line in raw.strip().splitlines():
             parts = line.strip().split("|")
@@ -159,7 +159,7 @@ class ImportService:
     def run_import(self, importer: ITaskImporter) -> int:
         """Использует только Request() — import_tasks() из Target."""
         print(f"\n  [ImportService] Импорт из: {importer.get_source_name()}")
-        tasks = importer.import_tasks()    # Request() на Target
+        tasks = importer.import_tasks()    
         for task in tasks:
             self._manager.add_task(task)
             print(f"    ✅ Добавлена: [{task.get_type()}] {task.title} / {task.subject}")

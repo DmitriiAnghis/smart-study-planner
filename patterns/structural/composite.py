@@ -80,14 +80,14 @@ class StudyPlanSection(PlanComponent):
     def __init__(self, name: str, icon: str = "📁"):
         super().__init__(name)
         self._icon     = icon
-        self._children: List[PlanComponent] = []   # «Потомки» из GoF
+        self._children: List[PlanComponent] = []   
 
     def is_composite(self) -> bool:
         return True
 
     def add(self, component: PlanComponent) -> "StudyPlanSection":
         self._children.append(component)
-        return self   # fluent interface для удобства
+        return self  
 
     def remove(self, component: PlanComponent) -> None:
         self._children.remove(component)
@@ -117,7 +117,6 @@ class StudyPlanSection(PlanComponent):
         return sum(c.get_completed_count() for c in self._children)
 
     def get_all_task_leaves(self) -> List[TaskLeaf]:
-        """Обходим дерево и собираем все листья для регистрации в Singleton."""
         leaves = []
         for c in self._children:
             if isinstance(c, TaskLeaf):

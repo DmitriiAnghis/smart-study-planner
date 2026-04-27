@@ -50,10 +50,10 @@ class DontWoryDecorator(TaskDecorator):
         self._mass = mass
 
     def execute(self) -> str:
-        base = self._component.execute()    # component->Operation()
+        base = self._component.execute()    
         return base + f"\n   [НЕ СРОЧНО]: {self._mass}"
     def get_info(self) -> dict:
-        info             = self._component.get_info()   # делегируем, затем расширяем
+        info             = self._component.get_info()   
         info["priority"] = "НИЗКИЙ"
         info["title"]    = f"  [НЕ СРОЧНО] {info['title']}"
         return info
@@ -63,14 +63,14 @@ class UrgentDecorator(TaskDecorator):
 
     def __init__(self, component: StudyTask, reason: str = "Дедлайн скоро"):
         super().__init__(component)
-        self._reason = reason      # addedState (GoF)
+        self._reason = reason      
 
     def execute(self) -> str:
-        base = self._component.execute()    # component->Operation()
+        base = self._component.execute()   
         return base + f"\n  🚨 [СРОЧНО]: {self._reason}"
 
     def get_info(self) -> dict:
-        info             = self._component.get_info()   # делегируем, затем расширяем
+        info             = self._component.get_info()   
         info["priority"] = "ВЫСОКИЙ"
         info["title"]    = f"🚨 {info['title']}"
         return info
