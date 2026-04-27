@@ -2,26 +2,26 @@
 
 
 class ThemeController:
-  
 
     def __init__(self, root, theme_manager, manager,
                  header, title_label, theme_btn, statusbar,
-                 notebook, tabs, text_widgets, stat_cards):
-      
-        self.root          = root
-        self.theme_manager = theme_manager
-        self.manager       = manager
-        self.header        = header
-        self.title_label   = title_label
-        self.theme_btn     = theme_btn
-        self.statusbar     = statusbar
-        self.notebook      = notebook
-        self.tabs          = tabs
-        self.text_widgets  = text_widgets
-        self.stat_cards    = stat_cards
+                 notebook, tabs, text_widgets, stat_cards,
+                 extra_header_widgets=None):
+
+        self.root                  = root
+        self.theme_manager         = theme_manager
+        self.manager               = manager
+        self.header                = header
+        self.title_label           = title_label
+        self.theme_btn             = theme_btn
+        self.statusbar             = statusbar
+        self.notebook              = notebook
+        self.tabs                  = tabs
+        self.text_widgets          = text_widgets
+        self.stat_cards            = stat_cards
+        self.extra_header_widgets  = extra_header_widgets or []
 
     def toggle(self, set_status_cb):
-        from tkinter import ttk
         current = self.manager.get_theme()
         if current == "light":
             self.theme_manager.switch_factory(DarkThemeFactory())
@@ -31,7 +31,6 @@ class ThemeController:
         set_status_cb(f"Тема изменена: {self.manager.get_theme()}")
 
     def apply(self):
-        """Применить текущую тему ко всем виджетам."""
         from tkinter import ttk
         cfg     = self.theme_manager.get_widget_configs()
         bg      = cfg["root_bg"]
@@ -46,10 +45,9 @@ class ThemeController:
         txt_bg  = "#1e2124" if is_dark else "#FFFFFF"
         card_bg = "#36393f" if is_dark else "#FFFFFF"
 
-        # Корень
         self.root.configure(bg=bg)
 
-        # Шапка
+        # шапка
         self.header.configure(bg=pan_cfg["bg"])
         self.title_label.configure(
             bg=pan_cfg["bg"],
@@ -62,7 +60,23 @@ class ThemeController:
             text="☀️  Светлая тема" if is_dark else "🌙  Тёмная тема")
         self.statusbar.configure(bg=pan_cfg["bg"], fg=lbl_cfg["fg"])
 
-        # Notebook стиль
+        # доп. виджеты шапки (Facade-кнопка и подпись)
+        facade_accent = "#f39c12" if not is_dark else "#f1c40f"
+        for w in self.extra_header_widgets:
+            try:
+                wtype = w.winfo_class()
+                if wtype == "Button":
+                    w.configure(
+                        bg=facade_accent, fg="#FFFFFF",
+                        activebackground="#d68910",
+                        font=("Segoe UI", 10, "bold"))
+                elif wtype == "Label":
+                    w.configure(bg=pan_cfg["bg"], fg=facade_accent,
+                                font=("Segoe UI", 7))
+            except Exception:
+                pass
+
+        # Notebook
         style   = ttk.Style()
         tab_bg  = "#40444b" if is_dark else "#e0e6ef"
         tab_fg  = "#ffffff" if is_dark else "#2c3e50"
@@ -88,7 +102,6 @@ class ThemeController:
                          font=("Segoe UI", 9, "bold"))
         style.map("Treeview", background=[("selected", tree_sel)])
 
-        # Combobox / Scrollbar
         style.configure("TCombobox",
                          fieldbackground=ent_cfg["bg"],
                          background=ent_cfg["bg"],
@@ -98,17 +111,17 @@ class ThemeController:
                          background=pan_cfg["bg"],
                          troughcolor=pan_cfg["bg"])
 
-        # Все фреймы вкладок
         for frame in self.tabs:
             self._apply_recursive(frame, bg, lbl_cfg, btn_cfg,
                                    ent_cfg, txt_bg, card_bg)
 
-        # Text-виджеты
         for tw in self.text_widgets:
-            tw.configure(bg=txt_bg, fg=lbl_cfg["fg"],
-                          insertbackground=lbl_cfg["fg"])
+            try:
+                tw.configure(bg=txt_bg, fg=lbl_cfg["fg"],
+                             insertbackground=lbl_cfg["fg"])
+            except Exception:
+                pass
 
-        # Карточки статистики
         for key, lbl in self.stat_cards.items():
             lbl.master.configure(bg=card_bg)
             for child in lbl.master.winfo_children():
@@ -148,6 +161,9 @@ class ThemeController:
             elif wtype == "Checkbutton":
                 widget.configure(bg=bg, fg=lbl_cfg["fg"],
                                   activebackground=bg)
+            elif wtype == "Text":
+                widget.configure(bg=txt_bg, fg=lbl_cfg["fg"],
+                                  insertbackground=lbl_cfg["fg"])
         except Exception:
             pass
 

@@ -11,6 +11,7 @@
     <OutputPath>.</OutputPath>
     <Name>smart_study_planner</Name>
     <RootNamespace>smart_study_planner</RootNamespace>
+    <TestFramework>Pytest</TestFramework>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -24,6 +25,7 @@
     <Compile Include="gui\app.py" />
     <Compile Include="gui\tabs\plans_tab.py" />
     <Compile Include="gui\tabs\stats_tab.py" />
+    <Compile Include="gui\tabs\structural_tab.py" />
     <Compile Include="gui\tabs\tasks_tab.py" />
     <Compile Include="gui\tabs\templates_tab.py" />
     <Compile Include="gui\tabs\__init__.py" />
@@ -35,12 +37,20 @@
     <Compile Include="patterns\factory_method.py" />
     <Compile Include="patterns\prototype.py" />
     <Compile Include="patterns\singleton.py" />
+    <Compile Include="patterns\structural\adapter.py" />
+    <Compile Include="patterns\structural\composite.py" />
+    <Compile Include="patterns\structural\decorator.py" />
+    <Compile Include="patterns\structural\facade.py" />
+    <Compile Include="patterns\structural\proxy.py" />
+    <Compile Include="patterns\structural\__init__.py" />
     <Compile Include="patterns\__init__.py" />
+    <Compile Include="test_structural.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="gui\" />
     <Folder Include="gui\tabs\" />
     <Folder Include="patterns\" />
+    <Folder Include="patterns\structural\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include=".gitignore" />
