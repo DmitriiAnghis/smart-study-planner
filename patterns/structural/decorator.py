@@ -1,21 +1,86 @@
-﻿
+﻿"""
+================================================================================
+  ПАТТЕРН DECORATOR (ДЕКОРАТОР) — Структурный паттерн
+  Источник: GoF «Design Patterns» стр. 175-184
+================================================================================
+
+  НАЗНАЧЕНИЕ (GoF, стр. 175):
+    Динамически добавляет объекту новые обязанности.
+    Декораторы — гибкая альтернатива порождению подклассов
+    с целью расширения функциональности.
+
+  СХЕМА (GoF, стр. 176):
+
+      ┌──────────────────┐
+      │   Component      │◄──────────────────────────────────┐
+      │──────────────────│                                   │
+      │ Operation()      │                                   │
+      └────────┬─────────┘                                   │
+               △                                             │
+       ┌───────┴────────────────┐             component      │
+       │                        │          ──────────────────>│
+  ┌────┴──────────┐   ┌─────────┴────────┐
+  │ConcreteComp.  │   │    Decorator     │
+  │───────────────│   │──────────────────│
+  │ Operation()   │   │ Operation() ○────┼──> component->Operation()
+  └───────────────┘   └────────┬─────────┘
+                                △
+                    ┌───────────┴───────────┐
+                    │                       │
+           ┌────────┴──────┐       ┌────────┴──────────┐
+           │ConcreteDecorA │       │ConcreteDecorB     │
+           │───────────────│       │───────────────────│
+           │ Operation()   │       │ Operation()       │
+           │ addedState    │       │ AddedBehavior()   │
+           └───────────────┘       └───────────────────┘
+
+  УЧАСТНИКИ (GoF, стр. 176):
+    • Component         — интерфейс, которому добавляют обязанности
+    • ConcreteComponent — базовый объект (StudyTask из factory_method.py)
+    • Decorator         — хранит ссылку «component», совпадает с его интерфейсом
+    • ConcreteDecorator — добавляет конкретную обязанность
+
+  КАК ВСТРОЕН В ПРОЕКТ:
+    Component         = StudyTask (factory_method.py) — не меняем!
+    ConcreteComponent = LectureTask / PracticeTask / RevisionTask
+    Декораторы добавляют новое поведение поверх любой задачи:
+      UrgentDecorator     — помечает задачу срочной (addedState: reason)
+      LoggingDecorator    — логирует выполнение в StudySessionManager
+      ReminderDecorator   — напоминание за N дней до дедлайна
+      DifficultyDecorator — уровень сложности, пересчитывает duration
+      DontWoryDecorator   — помечает задачу не срочной (пользовательский)
+================================================================================
+"""
+
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from re import S
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from patterns.factory_method import (
     StudyTask, LectureTask, PracticeTask, RevisionTask,
 )
 from patterns.singleton import StudySessionManager
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  DECORATOR — абстрактный декоратор (GoF)
+#  Хранит ссылку «component» и делегирует ему все вызовы
+# ═══════════════════════════════════════════════════════════════════════════════
 class TaskDecorator(StudyTask):
-   
+    """
+    Decorator (GoF).
+    Оборачивает любую StudyTask (Component).
+    Интерфейс совпадает с Component — клиент (Treeview, Manager) не замечает замены.
+
+    Ключевое: self._component — «component» из GoF-схемы стр.176.
+    """
 
     def __init__(self, component: StudyTask):
+        # Не вызываем StudyTask.__init__() — все данные берём из component
         object.__setattr__(self, '_component', component)
 
+    # ── Делегирование всех свойств оригинала ─────────────────────────────
     @property
     def task_id(self):             return self._component.task_id
     @property
@@ -35,6 +100,7 @@ class TaskDecorator(StudyTask):
     @property
     def created_at(self):          return self._component.created_at
 
+    # ── Operation() — базовая реализация: просто делегируем (GoF) ────────
     def execute(self) -> str:
         return self._component.execute()
 
@@ -44,53 +110,84 @@ class TaskDecorator(StudyTask):
     def get_info(self) -> dict:
         return self._component.get_info()
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CONCRETE DECORATOR — НЕ СРОЧНАЯ ЗАДАЧА (пользовательский)
+# ═══════════════════════════════════════════════════════════════════════════════
 class DontWoryDecorator(TaskDecorator):
-    def __init__(self, component: StudyTask, mass: str = "Раслабься" ):
+    """
+    Пользовательский декоратор.
+    Помечает задачу не срочной — снижает приоритет до НИЗКИЙ.
+    addedState: _mass (сообщение).
+    """
+
+    def __init__(self, component: StudyTask, mass: str = "Расслабься"):
         super().__init__(component)
         self._mass = mass
 
     def execute(self) -> str:
-        base = self._component.execute()    
+        base = self._component.execute()
         return base + f"\n   [НЕ СРОЧНО]: {self._mass}"
+
     def get_info(self) -> dict:
-        info             = self._component.get_info()   
+        info             = self._component.get_info()
         info["priority"] = "НИЗКИЙ"
         info["title"]    = f"  [НЕ СРОЧНО] {info['title']}"
         return info
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CONCRETE DECORATOR A — СРОЧНАЯ ЗАДАЧА
+#  addedState: _reason
+# ═══════════════════════════════════════════════════════════════════════════════
 class UrgentDecorator(TaskDecorator):
-   
+    """
+    ConcreteDecoratorA (GoF).
+    Добавляет обязанность: пометить задачу срочной.
+    Форсирует приоритет ВЫСОКИЙ и добавляет пометку в заголовок.
+    Код LectureTask / PracticeTask / RevisionTask — не меняется.
+    """
 
     def __init__(self, component: StudyTask, reason: str = "Дедлайн скоро"):
         super().__init__(component)
-        self._reason = reason      
+        self._reason = reason      # addedState (GoF)
 
     def execute(self) -> str:
-        base = self._component.execute()   
+        base = self._component.execute()    # component->Operation()
         return base + f"\n  🚨 [СРОЧНО]: {self._reason}"
 
     def get_info(self) -> dict:
-        info             = self._component.get_info()   
+        info             = self._component.get_info()
         info["priority"] = "ВЫСОКИЙ"
         info["title"]    = f"🚨 {info['title']}"
         return info
 
-class LoggingDecorator(TaskDecorator):
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CONCRETE DECORATOR B — ЛОГИРОВАНИЕ
+#  addedState: _log (список событий выполнения)
+# ═══════════════════════════════════════════════════════════════════════════════
+class LoggingDecorator(TaskDecorator):
+    """
+    ConcreteDecoratorB (GoF).
+    Добавляет обязанность: логировать каждый вызов execute()
+    прямо в StudySessionManager (Singleton) — интеграция с существующим кодом проекта.
+    """
 
     def __init__(self, component: StudyTask):
         super().__init__(component)
-        self._log: list = []       
+        self._log: list = []       # addedState (GoF)
 
     def execute(self) -> str:
         ts = datetime.now().strftime("%H:%M:%S")
         self._log.append({"time": ts, "task": self._component.title})
 
+        # Реальная интеграция: пишем в Singleton StudySessionManager
         StudySessionManager.get_instance()._log_event(
             f"[Decorator/Log] Запущена задача: {self._component.title}"
         )
 
-        result = self._component.execute()   
+        result = self._component.execute()   # component->Operation()
         return result + f"\n  📝 [Лог] Зафиксировано в сессии в {ts}"
 
     def get_log(self) -> list:
@@ -98,8 +195,15 @@ class LoggingDecorator(TaskDecorator):
         return list(self._log)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CONCRETE DECORATOR C — НАПОМИНАНИЕ
+# ═══════════════════════════════════════════════════════════════════════════════
 class ReminderDecorator(TaskDecorator):
-  
+    """
+    ConcreteDecoratorC (GoF).
+    Добавляет обязанность: показывать напоминание когда дедлайн близко.
+    «Надевается» поверх любого другого декоратора (матрёшка).
+    """
 
     def __init__(self, component: StudyTask, remind_days_before: int = 2):
         super().__init__(component)
@@ -121,8 +225,15 @@ class ReminderDecorator(TaskDecorator):
         return info
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CONCRETE DECORATOR D — УРОВЕНЬ СЛОЖНОСТИ
+# ═══════════════════════════════════════════════════════════════════════════════
 class DifficultyDecorator(TaskDecorator):
-  
+    """
+    ConcreteDecoratorD (GoF).
+    Добавляет уровень сложности и автоматически пересчитывает duration_minutes.
+    Переопределяет property duration_minutes через цепочку декораторов.
+    """
 
     LEVELS = {"лёгкий": 0.8, "средний": 1.0, "сложный": 1.4, "очень сложный": 1.8}
 
@@ -133,6 +244,7 @@ class DifficultyDecorator(TaskDecorator):
 
     @property
     def duration_minutes(self) -> int:
+        # AddedBehavior — переопределяем длительность
         return round(self._component.duration_minutes * self._multiplier)
 
     def execute(self) -> str:
@@ -146,6 +258,10 @@ class DifficultyDecorator(TaskDecorator):
         info["duration"] = f"{self.duration_minutes} мин  [{self._level}]"
         return info
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  ДЕМОНСТРАЦИЯ
+# ─────────────────────────────────────────────────────────────────────────────
 def demo():
     print("=" * 65)
     print("  DECORATOR — интеграция в Smart Study Planner")
@@ -163,7 +279,6 @@ def demo():
 
     print("\n📌 1.1. + DontWoryDecorator:")
     print(DontWoryDecorator(lecture).execute())
-
 
     print("\n📌 2. + LoggingDecorator:")
     print(LoggingDecorator(lecture).execute())
@@ -189,7 +304,7 @@ def demo():
 
     print("\n📌 6. Декорированная задача → StudySessionManager (Singleton):")
     manager = StudySessionManager.get_instance()
-    manager.add_task(full)   
+    manager.add_task(full)
     print(f"  Задач в сессии: {manager.get_statistics()['total_tasks']}")
     print(f"  Последний лог:  {manager.get_event_log()[-1]}")
 

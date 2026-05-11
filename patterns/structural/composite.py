@@ -1,10 +1,8 @@
-﻿
-
-from abc import ABC, abstractmethod
+﻿from abc import ABC, abstractmethod
 from typing import List, Optional
 from datetime import datetime
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from patterns.factory_method import StudyTask, LectureTask, PracticeTask, RevisionTask
 from patterns.singleton import StudySessionManager

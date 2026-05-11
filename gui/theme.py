@@ -19,6 +19,7 @@ class ThemeController:
         self.tabs                  = tabs
         self.text_widgets          = text_widgets
         self.stat_cards            = stat_cards
+        # доп. виджеты в шапке (кнопка Facade и её подпись)
         self.extra_header_widgets  = extra_header_widgets or []
 
     def toggle(self, set_status_cb):

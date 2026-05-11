@@ -33,6 +33,12 @@
     <Compile Include="gui\__init__.py" />
     <Compile Include="main.py" />
     <Compile Include="patterns\abstract_factory.py" />
+    <Compile Include="patterns\behavioral\chain_of_responsibility.py" />
+    <Compile Include="patterns\behavioral\command.py" />
+    <Compile Include="patterns\behavioral\observer.py" />
+    <Compile Include="patterns\behavioral\state.py" />
+    <Compile Include="patterns\behavioral\strategy.py" />
+    <Compile Include="patterns\behavioral\__init__.py" />
     <Compile Include="patterns\builder.py" />
     <Compile Include="patterns\factory_method.py" />
     <Compile Include="patterns\prototype.py" />
@@ -44,12 +50,14 @@
     <Compile Include="patterns\structural\proxy.py" />
     <Compile Include="patterns\structural\__init__.py" />
     <Compile Include="patterns\__init__.py" />
+    <Compile Include="test_behavioral.py" />
     <Compile Include="test_structural.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="gui\" />
     <Folder Include="gui\tabs\" />
     <Folder Include="patterns\" />
+    <Folder Include="patterns\behavioral\" />
     <Folder Include="patterns\structural\" />
   </ItemGroup>
   <ItemGroup>

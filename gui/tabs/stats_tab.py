@@ -7,6 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from patterns.structural.proxy import RealSessionManager, ProtectionProxy, CachingProxy
 
 
+# права, которые разрешены каждой роли
 _ROLE_PERMS = {
     "student": ["просмотр задач", "просмотр планов", "статистика"],
     "teacher": ["просмотр задач", "просмотр планов", "статистика",
@@ -14,6 +15,7 @@ _ROLE_PERMS = {
     "admin":   ["всё"],
 }
 
+# что заблокировано для роли (для подсказки)
 _ROLE_BLOCKED = {
     "student": "добавление / удаление задач",
     "teacher": "удаление задач и планов",
@@ -26,10 +28,12 @@ class StatsTab:
     def __init__(self, notebook, manager):
         self.manager = manager
 
+        # Proxy-слои поверх реального менеджера
         self._real          = RealSessionManager()
         self._caching_proxy = CachingProxy(self._real, ttl_seconds=5)
-        self._active_proxy  = self._real          
+        self._active_proxy  = self._real          # по умолчанию — прямой доступ
 
+        # переменная роли — используется в app.py для блокировки кнопок Tasks
         self.role_var = tk.StringVar(value="admin")
 
         self.frame = tk.Frame(notebook)
@@ -39,6 +43,7 @@ class StatsTab:
     def _build(self):
         tab = self.frame
 
+        # ── Заголовок + PROXY — переключатель роли ───────────────────────
         top = tk.Frame(tab)
         top.pack(fill="x", padx=16, pady=(14, 0))
 
@@ -57,11 +62,13 @@ class StatsTab:
                            command=self._on_role_change
                            ).pack(side="left", padx=4)
 
+        # строка с описанием текущих прав
         self._role_label = tk.Label(tab, text="",
                                      font=("Segoe UI", 8), fg="#888", anchor="e")
         self._role_label.pack(fill="x", padx=16)
         self._update_role_label()
 
+        # ── Карточки статистики ───────────────────────────────────────────
         cards_frame = tk.Frame(tab)
         cards_frame.pack(fill="x", padx=16, pady=(8, 0))
 
@@ -81,11 +88,13 @@ class StatsTab:
             tk.Label(card, text=label, font=("Segoe UI", 9)).pack()
             self.stat_cards[key] = val_lbl
 
+        # ── Лог событий ──────────────────────────────────────────────────
         log_header = tk.Frame(tab)
         log_header.pack(fill="x", padx=16, pady=(10, 2))
         tk.Label(log_header, text="Лог событий сессии:",
                  font=("Segoe UI", 11, "bold")).pack(side="left")
 
+        # индикатор Proxy активен / не активен
         self._proxy_badge = tk.Label(
             log_header, text="",
             font=("Segoe UI", 8), padx=6, pady=2, relief="flat")
@@ -103,6 +112,7 @@ class StatsTab:
         self.log_text.pack(side="left", fill="both", expand=True)
         sc.pack(side="right", fill="y")
 
+        # ── Кнопки ───────────────────────────────────────────────────────
         btn_row = tk.Frame(tab)
         btn_row.pack(fill="x", padx=16, pady=(0, 10))
 
@@ -133,6 +143,7 @@ class StatsTab:
         """Вызывается при смене роли — обновляет подсказку и сигнализирует app."""
         self._update_role_label()
         self._update_proxy_badge()
+        # публичный callback — app.py подключает его к обновлению кнопок Tasks
         if hasattr(self, "_on_role_cb") and self._on_role_cb:
             self._on_role_cb(self.role_var.get())
 
@@ -174,16 +185,19 @@ class StatsTab:
 
 
     def refresh(self):
+        # статистика через активный proxy (Real или Caching)
         stats = self._active_proxy.get_statistics()
         self.stat_cards["total_tasks"].config(text=str(stats.get("total_tasks", 0)))
         self.stat_cards["completed"].config(text=str(stats.get("completed_tasks", 0)))
         self.stat_cards["progress"].config(text=f"{stats.get('progress_percent', 0)}%")
         self.stat_cards["plans"].config(text=str(stats.get("total_plans", 0)))
 
+        # обновляем подпись кэша если он активен
         if self._active_proxy is self._caching_proxy:
             cs = self._caching_proxy.cache_stats()
             self._cache_label.configure(text=f"⚡ CachingProxy  {cs}")
 
+        # лог событий — всегда напрямую
         self.log_text.configure(state="normal")
         self.log_text.delete("1.0", "end")
         for entry in reversed(self.manager.get_event_log()):

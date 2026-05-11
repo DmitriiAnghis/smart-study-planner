@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from typing import List
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from patterns.factory_method import (StudyTask, LectureTask, PracticeTask,
                                      RevisionTask, LectureTaskCreator,

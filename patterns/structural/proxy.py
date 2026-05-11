@@ -1,10 +1,8 @@
-﻿
-
-from abc import ABC, abstractmethod
+﻿from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, Dict
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from patterns.singleton import StudySessionManager
 
@@ -233,5 +231,3 @@ class LoggingProxy(ISessionManager):
 
     def get_audit(self) -> list:
         return list(self._audit)
-
-

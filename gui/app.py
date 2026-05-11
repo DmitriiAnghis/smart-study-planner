@@ -10,12 +10,17 @@ from patterns.factory_method   import LectureTaskCreator, PracticeTaskCreator, R
 from patterns.abstract_factory import LightThemeFactory, ThemeManager
 from patterns.builder          import PlannerDirector, IntensivePlanBuilder, RelaxedPlanBuilder
 from patterns.prototype        import TemplateRegistry
-from patterns.structural.facade import SmartStudyFacade
+from patterns.structural.facade import SmartStudyFacade          
+
+from patterns.behavioral.observer import (
+    TasksTabObserver, StatsTabObserver,
+    PlansTabObserver, StatusBarObserver,
+)
 
 from gui.tabs.tasks_tab     import TasksTab
 from gui.tabs.plans_tab     import PlansTab
 from gui.tabs.templates_tab import TemplatesTab
-from gui.tabs.stats_tab     import StatsTab
+from gui.tabs.stats_tab     import StatsTab      
 from gui.theme              import ThemeController
 
 
@@ -27,7 +32,8 @@ class SmartStudyPlannerApp:
         self.root.geometry("1100x720")
         self.root.minsize(900, 600)
 
-        self.manager       = StudySessionManager.get_instance()
+        self.manager = StudySessionManager.get_instance()
+
         self.theme_manager = ThemeManager(LightThemeFactory())
 
         self._creators = {
@@ -36,16 +42,69 @@ class SmartStudyPlannerApp:
             "Повторение": RevisionTaskCreator(),
         }
 
-        self.director          = PlannerDirector()
+        self.director = PlannerDirector()
+
         self.template_registry = TemplateRegistry()
-        self._facade           = SmartStudyFacade(theme="light")
+
+    
+        self._facade = SmartStudyFacade(theme="light")
 
         self._build_ui()
         self.theme_ctrl.apply()
-        self._refresh_all()
+
+       
+        self._setup_observers()
+
 
         self.stats_tab.set_role_callback(self._apply_role)
         self._apply_role("admin")
+
+        self._refresh_all()
+
+
+    def _setup_observers(self):
+   
+        self.manager.attach(TasksTabObserver(self.tasks_tab.refresh))
+        self.manager.attach(PlansTabObserver(self.plans_tab.refresh))
+        self.manager.attach(StatsTabObserver(self.stats_tab.refresh))
+        self.manager.attach(StatusBarObserver(self._set_status))
+
+
+    def _apply_role(self, role: str):
+ 
+        can_create = role in ("teacher", "admin")
+        can_delete = role == "admin"
+        can_done   = role in ("teacher", "admin")
+
+        self.tasks_tab.btn_create.configure(
+            state="normal" if can_create else "disabled")
+        self.tasks_tab.btn_delete.configure(
+            state="normal" if can_delete else "disabled")
+        self.tasks_tab.btn_done.configure(
+            state="normal" if can_done else "disabled")
+        self.plans_tab.btn_delete.configure(
+            state="normal" if can_delete else "disabled")
+
+        emoji = {"student": "👨‍🎓", "teacher": "👨‍🏫", "admin": "🔑"}.get(role, "")
+        self._set_status(
+            f"🛡 Proxy: роль {emoji} {role} — "
+            f"{'полный доступ' if role == 'admin' else 'ограниченный доступ'}")
+
+
+    def _facade_quick_start(self):
+   
+        dlg = _QuickStartDialog(self.root)
+        self.root.wait_window(dlg)
+        if not dlg.result:
+            return
+
+        subject, days, plan_type = dlg.result
+        result = self._facade.create_full_session(
+            subject, days=days, daily_hours=3.0, plan_type=plan_type)
+
+        self.plans_tab.refresh()
+        self._set_status(f"⚡ Facade: {result['summary']}")
+
 
     def _build_ui(self):
         self.header = tk.Frame(self.root, height=64)
@@ -72,6 +131,15 @@ class SmartStudyPlannerApp:
             text="Facade",
             font=("Segoe UI", 7), fg="#888")
         self._facade_label.pack(side="left", pady=12)
+
+        self.undo_btn = tk.Button(
+            self.header,
+            text="↩️  Отменить",
+            font=("Segoe UI", 10),
+            relief="flat", padx=12, pady=6,
+            cursor="hand2",
+            command=self._undo_last)
+        self.undo_btn.pack(side="left", padx=(8, 4), pady=12)
 
         self.theme_btn = tk.Button(
             self.header,
@@ -133,43 +201,13 @@ class SmartStudyPlannerApp:
             extra_header_widgets  = [self.facade_btn, self._facade_label],
         )
 
-    def _facade_quick_start(self):
-        dlg = _QuickStartDialog(self.root)
-        self.root.wait_window(dlg)
 
-        if not dlg.result:
-            return
+    def _undo_last(self):
+        """Делегируем undo в TasksTab — там живёт CommandInvoker."""
+        self.tasks_tab.undo_last()
 
-        subject, days, plan_type = dlg.result
-
-        result = self._facade.create_full_session(
-            subject, days=days, daily_hours=3.0, plan_type=plan_type)
-
-        self._refresh_all()
-        self._set_status(f"⚡ Facade: {result['summary']}")
-
-    def _apply_role(self, role: str):
-        can_create = role in ("teacher", "admin")
-        can_delete = role == "admin"
-        can_done   = role in ("teacher", "admin")
-
-        self.tasks_tab.btn_create.configure(
-            state="normal" if can_create else "disabled")
-        self.tasks_tab.btn_delete.configure(
-            state="normal" if can_delete else "disabled")
-        self.tasks_tab.btn_done.configure(
-            state="normal" if can_done else "disabled")
-        self.plans_tab.btn_delete.configure(
-            state="normal" if can_delete else "disabled")
-
-        emoji = {"student": "👨‍🎓", "teacher": "👨‍🏫", "admin": "🔑"}.get(role, "")
-        self._set_status(
-            f"🛡 Proxy: роль {emoji} {role} — "
-            f"{'полный доступ' if role == 'admin' else 'ограниченный доступ'}")
 
     def _toggle_theme(self):
-        theme = self.manager.get_theme()
-        self._facade.switch_theme("dark" if theme == "light" else "light")
         self.theme_ctrl.toggle(self._set_status)
 
     def _refresh_all(self):
@@ -183,11 +221,10 @@ class SmartStudyPlannerApp:
 
     def _set_status(self, msg: str):
         self.statusbar.configure(text=f"  {msg}")
-        self.root.after(5000, lambda: self.statusbar.configure(
+        self.root.after(4000, lambda: self.statusbar.configure(
             text="  ✅  Готово"))
 
 
-# ── ДИАЛОГ БЫСТРОГО СТАРТА ───────────────────────────────────────────────────
 
 class _QuickStartDialog(tk.Toplevel):
 
@@ -197,10 +234,7 @@ class _QuickStartDialog(tk.Toplevel):
         self.resizable(False, False)
         self.grab_set()
         self.result = None
-
-        x = parent.winfo_x() + 300
-        y = parent.winfo_y() + 200
-        self.geometry(f"+{x}+{y}")
+        self.geometry(f"+{parent.winfo_x()+300}+{parent.winfo_y()+200}")
 
         subjects = ["Математика", "Физика", "Химия", "Биология",
                     "История", "Информатика", "Литература"]
@@ -209,15 +243,14 @@ class _QuickStartDialog(tk.Toplevel):
                  font=("Segoe UI", 13, "bold")).pack(padx=14, pady=(14, 2))
 
         tk.Label(self,
-                 text="Facade запустит Builder + Factory + Singleton\n"
-                      "и результат появится в Tasks и Plans",
+                 text="Facade запустит Builder + Factory Method + Singleton.\n"
+                      "Результат сразу появится в Tasks и Plans.",
                  font=("Segoe UI", 9), fg="#666").pack(padx=14, pady=(0, 8))
 
         tk.Label(self, text="Предмет:", font=("Segoe UI", 10)).pack(anchor="w", padx=14)
         self._subj = tk.StringVar(value=subjects[0])
-        ttk.Combobox(self, textvariable=self._subj,
-                     values=subjects, width=22,
-                     font=("Segoe UI", 10)).pack(padx=14, pady=(2, 8))
+        ttk.Combobox(self, textvariable=self._subj, values=subjects,
+                     width=22, font=("Segoe UI", 10)).pack(padx=14, pady=(2, 8))
 
         tk.Label(self, text="Дней до экзамена:", font=("Segoe UI", 10)).pack(anchor="w", padx=14)
         self._days = tk.IntVar(value=14)
@@ -238,13 +271,13 @@ class _QuickStartDialog(tk.Toplevel):
         btn_row = tk.Frame(self)
         btn_row.pack(pady=(0, 14))
         tk.Button(btn_row, text="⚡  Запустить",
-                  font=("Segoe UI", 11, "bold"),
-                  relief="flat", padx=16, pady=8,
-                  cursor="hand2", command=self._ok).pack(side="left", padx=6)
+                  font=("Segoe UI", 11, "bold"), relief="flat",
+                  padx=16, pady=8, cursor="hand2",
+                  command=self._ok).pack(side="left", padx=6)
         tk.Button(btn_row, text="Отмена",
-                  font=("Segoe UI", 10),
-                  relief="flat", padx=12, pady=8,
-                  cursor="hand2", command=self.destroy).pack(side="left")
+                  font=("Segoe UI", 10), relief="flat",
+                  padx=12, pady=8, cursor="hand2",
+                  command=self.destroy).pack(side="left")
 
     def _ok(self):
         self.result = (self._subj.get(), self._days.get(), self._ptype.get())

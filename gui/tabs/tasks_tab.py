@@ -5,6 +5,9 @@ import sys, os, io, contextlib
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
+from patterns.behavioral.state import StudyTaskWithState
+from patterns.behavioral.chain_of_responsibility import TaskValidationChain
+
 from patterns.structural.decorator import (
     UrgentDecorator, LoggingDecorator,
     ReminderDecorator, DifficultyDecorator,
@@ -13,6 +16,16 @@ from patterns.structural.adapter import (
     GoogleCalendarAdapter, TrelloAdapter,
     PlainTextAdapter, ImportService,
 )
+from patterns.behavioral.command import (
+    AddTaskCommand, RemoveTaskCommand,
+    CompleteTaskCommand, CommandInvoker,
+)
+from patterns.behavioral.strategy import (
+    TaskSorterContext, SortByDeadline, SortByPriority,
+    SortBySubject, SortByType, FilterAll,
+    FilterPending, FilterCompleted,
+)
+from patterns.behavioral.state import StudyTaskWithState, NewTaskState
 
 
 class TasksTab:
@@ -22,7 +35,11 @@ class TasksTab:
         self._creators      = creators
         self._set_status    = set_status_cb
         self._refresh_stats = refresh_stats_cb
+        self._invoker = CommandInvoker()
+        self._sorter = TaskSorterContext()
+        self._chain = TaskValidationChain(self.manager)
         self._import_svc    = ImportService(manager)   
+        self._active_states = {}   # task_id → StudyTaskWithState
 
         self.frame = tk.Frame(notebook)
         notebook.add(self.frame, text="  ✏️  Задачи  ")
@@ -177,6 +194,25 @@ class TasksTab:
         self.tree.pack(side="left", fill="both", expand=True)
         scroll_y.pack(side="right", fill="y")
 
+    def undo_last(self):
+        # Берём команду ДО undo чтобы знать какую задачу сбросить
+        if not self._invoker.can_undo():
+            self._set_status("↩ Нечего отменять")
+            return
+
+        last_cmd = self._invoker._history[-1]
+        msg = self._invoker.undo()
+
+        # Если отменяли CompleteTaskCommand — сбрасываем State обратно
+        if hasattr(last_cmd, 'get_task'):
+            task = last_cmd.get_task()
+            if task.task_id in self._active_states:
+                ws = self._active_states[task.task_id]
+                ws._state = NewTaskState()
+
+        self.refresh()
+        self._refresh_stats()
+        self._set_status(f"↩ {msg}")
 
     def create_task(self):
         """Factory Method + опциональный Decorator."""
@@ -191,9 +227,15 @@ class TasksTab:
             return
 
         deadline = datetime.now() + timedelta(days=days)
+        error = self._chain.validate(title, subject, duration, deadline)
+        if error:
+            messagebox.showwarning("Ошибка валидации", error)
+            return
         creator  = self._creators[task_type]
 
-        task = creator.factory_method(title, subject, duration, deadline)
+        task        = creator.factory_method(title, subject, duration, deadline)
+        task_ws     = StudyTaskWithState(task)
+       
 
         decorators_applied = []
         if self._use_diff.get():
@@ -209,7 +251,8 @@ class TasksTab:
             task = UrgentDecorator(task, reason="Отмечено пользователем")
             decorators_applied.append("🚨")
 
-        self.manager.add_task(task)
+        self._invoker.execute_command(AddTaskCommand(self.manager, task))
+        self._active_states[task.task_id] = task_ws
 
         self.task_title_var.set("")
         self.refresh()
@@ -224,11 +267,11 @@ class TasksTab:
         if not sel:
             messagebox.showwarning("Ошибка", "Выберите задачу для удаления!")
             return
-        title_val = self.tree.item(sel[0])["values"][1]
+        title_val = str(self.tree.item(sel[0])["values"][1])
         clean = title_val.lstrip("🚨🔔 ")
         for t in self.manager.get_all_tasks():
             if t.title == clean or t.title == title_val:
-                self.manager.remove_task(t.task_id)
+                self._invoker.execute_command(RemoveTaskCommand(self.manager, t))
                 break
         self.refresh()
         self._refresh_stats()
@@ -239,11 +282,20 @@ class TasksTab:
         if not sel:
             messagebox.showwarning("Ошибка", "Выберите задачу!")
             return
-        title_val = self.tree.item(sel[0])["values"][1]
+        title_val = str(self.tree.item(sel[0])["values"][1])
         clean = title_val.lstrip("🚨🔔 ")
         for t in self.manager.get_all_tasks():
-            if (t.title == clean or t.title == title_val) and not t.completed:
-                self.manager.mark_task_completed(t.task_id)
+            if t.title == clean or t.title == title_val:
+                # Если задачи нет в _active_states — добавляем прямо сейчас
+                if t.task_id not in self._active_states:
+                    self._active_states[t.task_id] = StudyTaskWithState(t)
+                ws = self._active_states[t.task_id]
+                if not t.completed:
+                    self._invoker.execute_command(
+                        CompleteTaskCommand(self.manager, t))
+                # Переводим через start() если задача ещё новая
+                ws.start()      # Новая → В работе
+                ws.complete()   # В работе → Выполнена
                 break
         self.refresh()
         self._refresh_stats()
@@ -272,8 +324,17 @@ class TasksTab:
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-        for task in self.manager.get_all_tasks():
+        all_tasks = self.manager.get_all_tasks()
+        for task in self._sorter.get_tasks(all_tasks):
             info = task.get_info()
+
+            # Если задачи нет в _active_states — создаём State-обёртку
+            if task.task_id not in self._active_states:
+                self._active_states[task.task_id] = StudyTaskWithState(task)
+
+            ws = self._active_states[task.task_id]
+            ws.check_overdue()
+            info["done"] = ws.get_status_label()
 
             dec_icons = _detect_decorators(task)
 
@@ -287,7 +348,6 @@ class TasksTab:
                 dec_icons,
                 info["done"],
             ))
-
 
 def _detect_decorators(task) -> str:
     """Проходим цепочку декораторов и собираем иконки."""
