@@ -54,13 +54,16 @@
     <Compile Include="test_structural.py" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include=".github\workflows\" />
     <Folder Include="gui\" />
     <Folder Include="gui\tabs\" />
+    <Folder Include=".github\" />
     <Folder Include="patterns\" />
     <Folder Include="patterns\behavioral\" />
     <Folder Include="patterns\structural\" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include=".github\workflows\main.yml" />
     <Content Include=".gitignore" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
